@@ -11,12 +11,10 @@ documents/ 目录说明与浏览顺序（提交包顶层为 documents/ 与 code/
    k_sweep.csv            实验族 B：固定 N=100000、购买量 K 从 ~100 到 10^6 的梯度反转
    dist.csv               实验族 C：五种典型分布（低价、高价、全相等、阶梯离散、断层）
    huge_budget.csv        实验族 D：突破题面限制的超大预算拓展（D 从 10^6 到 10^14）
-   huge_value.csv         实验族 E：等比例缩放控制变量实验（验证弱多项式与强多项式差异）
    figures/
      fig1_scale.png         总耗时与剔除排序后的核心求解耗时随规模变化
      fig2_k_sweep.png       购买件数 K 梯度下的性能反转与排序/求解占比拆解
-     fig3_huge_budget.png   超大预算拓展下四算法耗时的量级分化
-     fig4_value_scaling.png 等比例缩放下轮数、操作步数与实测耗时的对照
+     fig3_huge_budget.png   超大预算拓展下堆算法与值域二分的量级分化
 
 说明：
 - results/ 中的全部耗时均在同一台机器、GCC -O2、同一批实验内测得，

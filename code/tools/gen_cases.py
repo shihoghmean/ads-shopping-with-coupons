@@ -1,4 +1,4 @@
-"""生成 ADS Project 5 (Shopping With Coupons) 五大基准实验族数据。
+"""生成 ADS Project 5 (Shopping With Coupons) 四大基准实验族数据。
 
 所有随机输入使用固定种子 20261123，输出到仓库根的 data/ 目录（不入库、不进提交包），
 任意机器运行本脚本都能逐字节复现报告第 3、4 章的全部测试输入。
@@ -114,35 +114,13 @@ def gen_huge_budget(rng):
         write_case("huge_budget", tag, prices, coupons, bud)
 
 
-def gen_huge_value(rng):
-    """实验族 E：等比例缩放控制变量实验（固定 N=50000 与矩阵序结构，整体放大值域 1..10^11 倍）"""
-    n = 50000
-    base_c = [rng.randint(1, 5000) for _ in range(n)]
-    max_c = max(base_c)
-    base_p = [rng.randint(max_c + 1, max_c + 5000) for _ in range(n)]
-    base_d = 50_000_000  # 保证能买出 ~10^5 级配对，处于矩阵内部而非边界
-
-    for tag, scale in [
-        ("V1_x1e0", 1),
-        ("V2_x1e3", 10**3),
-        ("V3_x1e6", 10**6),
-        ("V4_x1e9", 10**9),
-        ("V5_x1e11", 10**11),
-    ]:
-        p = [x * scale for x in base_p]
-        c = [x * scale for x in base_c]
-        d = base_d * scale
-        write_case("huge_value", tag, p, c, d)
-
-
 def main():
     rng = random.Random(20261123)
     gen_scale(rng)
     gen_k_sweep(rng)
     gen_dist(rng)
     gen_huge_budget(rng)
-    gen_huge_value(rng)
-    print(f"已生成五大实验族输入到: {DATA_DIR}")
+    print(f"已生成四大实验族输入到: {DATA_DIR}")
 
 
 if __name__ == "__main__":

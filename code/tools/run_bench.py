@@ -96,17 +96,8 @@ def main():
         ("huge_budget/B2_1e7.in", "fast", 10),
         ("huge_budget/B3_1e8.in", "fast", 5),
         ("huge_budget/B4_1e10.in", "fast", 2),
-        ("huge_budget/B5_1e12.in", "nologk", 10),
-        ("huge_budget/B6_1e14.in", "nologk", 10),
-    ])
-
-    print("=== Suite E: huge_value ===")
-    run_suite("huge_value.csv", [
-        ("huge_value/V1_x1e0.in", "nologk", 15),
-        ("huge_value/V2_x1e3.in", "nologk", 15),
-        ("huge_value/V3_x1e6.in", "nologk", 15),
-        ("huge_value/V4_x1e9.in", "nologk", 15),
-        ("huge_value/V5_x1e11.in", "nologk", 15),
+        ("huge_budget/B5_1e12.in", "bsearch", 10),
+        ("huge_budget/B6_1e14.in", "bsearch", 10),
     ])
 
     print("全部基准实验完成。")

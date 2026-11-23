@@ -4,13 +4,12 @@ Shopping With Coupons —— Project 5 的 code/ 说明（build & run）
 code/ 内部结构
 --------------
 src/          主程序源码，三个文件，C++17
-  solvers.h     五个求解器的统一接口与结果结构体声明
-  solvers.cpp   五个求解器的实现：
+  solvers.h     四个求解器的统一接口与结果结构体声明
+  solvers.cpp   四个求解器的实现：
                 brute（N^2 展开排序基准）
                 heap_full（标准 N 路归并最小堆）
                 heap_lazy（网格前沿懒扩展最小堆）
                 bsearch（值域二分 + 单调双指针 + 前缀和）
-                prune（强多项式矩阵加权中位数剪枝，BFPRT 确定性线性选择）
   main.cpp      标准 stdin/stdout 入口、内建自检 test、求解 solve、基准 bench
 samples/      题面样例与三组边界样例（.in 与对应的 .out）
 tools/        Python 3 辅助脚本：生成基准数据、跑基准、画图、统计注释率与自检
@@ -62,8 +61,8 @@ Linux / macOS 下将输出名改为 coupons 即可。
 
        .\coupons.exe test
 
-   依次运行 10 组手工边界用例、300 组固定种子（20261123）随机小规模五算法暴力对拍、
-   30 组中大规模四算法对拍与 20 组超大预算/超大值域对拍。全部通过时打印汇总行并以 0 退出；
+   依次运行 10 组手工边界用例、300 组固定种子（20261123）随机小规模四算法暴力对拍、
+   30 组中大规模三算法对拍与 20 组大预算四算法暴力对拍。全部通过时打印汇总行并以 0 退出；
    任一算法结果不一致会打印冲突用例并以 1 退出。
 
 3) 单文件求解（可指定单个算法或 all 同步校验）：
@@ -74,9 +73,9 @@ Linux / macOS 下将输出名改为 coupons 即可。
 
        .\coupons.exe bench <输入文件> [算法或算法组] [重复次数] [--csv]
 
-       算法/组    brute | heap_full | heap_lazy | bsearch | prune | all | fast | nologk | heaps
-                  缺省 fast（运行除 brute 外的四个非暴力算法）
-       重复次数   缺省 1；单次耗时较短时设 5 以上以平滑 clock() 毫秒粒度
+       算法/组    brute | heap_full | heap_lazy | bsearch | all | fast | heaps
+                  缺省 fast（运行除 brute 外的三个高效算法）
+       重复次数   缺省 1；单次耗时较短时设 10 以上以平滑 clock() 毫秒粒度
        --csv      输出 12 列 CSV：
                   algo,case,n,budget,count,rem,repeat,sort_ms,solve_ms,total_ms,ops,rounds
 
@@ -84,7 +83,7 @@ Linux / macOS 下将输出名改为 coupons 即可。
 
 辅助脚本（tools/，在仓库根执行）
 --------------------------------
-    python code/tools/gen_cases.py    按固定种子 20261123 生成五大实验族数据到 data/
+    python code/tools/gen_cases.py    按固定种子 20261123 生成四大实验族数据到 data/
     python code/tools/run_bench.py    批量运行全部基准实验，写出 CSV 到 documents/results/
-    python code/tools/plot.py         读取 CSV，生成统计图表到 documents/results/figures/
-    python code/tools/check_pkg.py    检查源码注释率与匿名合规性
+    python code/tools/plot.py         读取 CSV，生成三张统计图表到 documents/results/figures/
+    python code/tools/check_pkg.py    检查源码注释率与匿名打包自检

@@ -14,8 +14,8 @@ using namespace std;
 /*
 主程序只编译出单一可执行文件 coupons.exe，承接四种入口：
   1. 无命令行参数：完全兼容题面标准输入输出，从 stdin 读入并只输出「最大件数 最大余额」；
-  2. test：内建全套正确性自检，涵盖题面样例、十类边界用例、300 组随机五算法暴力对拍、
-     中大规模四算法对拍以及超大预算/超大值域下的二分与剪枝对拍；
+  2. test：内建全套正确性自检，涵盖题面样例、十类边界用例、300 组随机四算法暴力对拍、
+     中大规模三算法对拍以及大预算/大值域下对拍独立暴力；
   3. solve <file> [algo]：从文本文件读入单组数据求解；
   4. bench <file> [algo] [repeat] [--csv]：批量计时与工作量统计，供实验脚本汇总画图。
 
@@ -102,17 +102,16 @@ string baseName(const string& path){
 
 /*
 将命令行算法组名映射为具体求解器列表：
-  - all：N<=4000 时五算法全跑，超出时自动跳过暴力避免 80 GB 内存溢出；
-  - fast：除暴力外四个多项式/近线性算法；
-  - nologk：仅跑与 K 无关的 bsearch 与 prune，用于 D>=10^12 的超大预算拓展实验。
+  - all：N<=4000 时四算法全跑，超出时自动跳过暴力避免内存溢出；
+  - fast：除暴力外三个高效算法（heap_full、heap_lazy、bsearch）；
+  - heaps：仅跑两类最小堆。
 */
 vector<string> expandAlgos(const string& name,int n){
     if(name=="all"){
-        if(n<=4000) return {"brute","heap_full","heap_lazy","bsearch","prune"};
-        return {"heap_full","heap_lazy","bsearch","prune"};
+        if(n<=4000) return {"brute","heap_full","heap_lazy","bsearch"};
+        return {"heap_full","heap_lazy","bsearch"};
     }
-    if(name=="fast") return {"heap_full","heap_lazy","bsearch","prune"};
-    if(name=="nologk") return {"bsearch","prune"};
+    if(name=="fast") return {"heap_full","heap_lazy","bsearch"};
     if(name=="heaps") return {"heap_full","heap_lazy"};
     return {name};
 }
@@ -146,7 +145,6 @@ bool checkCase(const string& tag,const vector<long long>& prices,const vector<lo
         algos.push_back("heap_lazy");
     }
     algos.push_back("bsearch");
-    algos.push_back("prune");
 
     long long refCnt=expCnt,refRem=expRem;
     bool hasRef=hasExp;
@@ -171,9 +169,9 @@ bool checkCase(const string& tag,const vector<long long>& prices,const vector<lo
 /*
 四层递进正确性自检（无外部文件依赖，随机种子固定为 20261123 保证完全可复现）：
   1. 10 组手工构造的边界用例：覆盖题面样例、零买、全买、全等平地、价格断层与大数防溢出；
-  2. 300 组随机小规模五算法全对拍：以独立暴力 brute 为真值，涵盖均匀、高重复、大断层、10^9 值域；
-  3. 30 组中大规模四算法对拍（N 到 3000）：检验堆、二分、剪枝在更大规模下无边界偏差；
-  4. 20 组超大预算/超大值域对拍（D 与值域到 10^15）：验证 __int128 与 BFPRT 在极限尺度下逐位一致。
+  2. 300 组随机小规模四算法全对拍：以独立暴力 brute 为真值，涵盖均匀、高重复、大断层、10^9 值域；
+  3. 30 组中大规模三算法对拍（N 到 3000）：检验两类堆与值域二分在更大规模下无边界偏差；
+  4. 20 组大预算四算法暴力对拍（N=300，D 最高 10^13）：以独立暴力直接验证 __int128 与收尾公式。
 */
 int runSelfTest(){
     vector<FixedCase> fixed={
@@ -198,11 +196,11 @@ int runSelfTest(){
     // 固定种子随机生成器：确保任意环境复跑测试覆盖同一批压力分布
     mt19937_64 rng(20261123ULL);
     /*
-    第二部分：300 组随机小规模五算法全对拍（N in [1,80]）。
+    第二部分：300 组随机小规模四算法全对拍（N in [1,80]）。
     为什么刻意轮换四类分布而不是只做单一均匀随机？
       - 单纯均匀随机几乎撞不上「临界价大量重复」与「断层跨过预算 D」，
-        而这两处恰恰是值域二分收尾公式与 BFPRT 三路划分最容易写错的边界；
-      - 与独立暴力 brute 逐项比对，可彻底排除四个高效算法共同犯错的可能。
+        而这两处恰恰是值域二分收尾公式与上界收紧最容易写错的边界；
+      - 与独立暴力 brute 逐项比对，可彻底排除三个高效算法共同犯错的可能。
     */
     for(int tc=1;tc<=300;tc++){
         int n=(int)(rng()%80)+1;// 覆盖 N=1 到 80，兼顾极小退化与中小规模矩阵
@@ -214,7 +212,7 @@ int runSelfTest(){
             baseC=1; spanC=500; gap=1+(long long)(rng()%20); spanP=500;
             budget=(long long)(rng()%50000)+1;
         }else if(mode==1){
-            // 极小值域高重复分布：高频触发临界价重复值收尾与 BFPRT 三路等值段
+            // 极小值域高重复分布：高频触发临界价重复值收尾公式
             baseC=1; spanC=5; gap=1; spanP=5;
             budget=(long long)(rng()%3000)+1;
         }else if(mode==2){
@@ -248,9 +246,9 @@ int runSelfTest(){
     }
 
     /*
-    第三部分：30 组中大规模四算法对拍（N in [500,3000], D<=10^6）。
+    第三部分：30 组中大规模三算法对拍（N in [500,3000], D<=10^6）。
     跳过 brute 是因为 N=3000 时 N^2=9e6 反复排序耗时过长；
-    保留两种堆与二分、剪枝互相对拍，可重点覆盖动态堆扩容、多层 BFPRT 递归与活性行剔除。
+    保留两类堆与值域二分互相对拍，覆盖动态堆扩容与多轮双指针早停路径。
     */
     for(int tc=1;tc<=30;tc++){
         int n=500+(int)(rng()%2501);// 覆盖 500 到 3000 的中大规模区间
@@ -270,15 +268,14 @@ int runSelfTest(){
     }
 
     /*
-    第四部分：20 组超大预算与超大值域对拍（D 最高 10^15，单价跨度最高 10^12）。
-    在此尺度下 K 可达数百万以上，逐件弹堆已极慢，专门校验 bsearch 与 prune 两类独立范式：
-      - 若 64 位整数在 mid=(lo+hi)/2 或前缀和累计中发生静默溢出，两算法分支不同极易暴露分歧；
-      - 偶数用例侧重超大值域，奇数用例侧重超大购买件数 K。
+    第四部分：20 组大预算与大值域暴力对拍（N=300，D 最高 10^14，单价最高 10^9）。
+    选 N=300 使矩阵总计 9 万对，独立暴力 brute 仍可在毫秒内算出精确真值，
+    从而在不依赖第二个非暴力算法的前提下，直接检验 bsearch 的 __int128 防溢出与收尾公式。
     */
     for(int tc=1;tc<=20;tc++){
-        int n=2000;// 固定 2000 行使矩阵共有 400 万配对，足以测透百万级 K 与大值域
+        int n=300;// 矩阵共 9 万对，兼顾大预算部分买/全买覆盖与暴力秒级验证
         vector<long long> prices(n),coupons(n);
-        long long span=(tc%2==0)?1000000000000LL:1000000LL;// 交替切换 10^12 大值域与 10^6 常规值域
+        long long span=(tc%2==0)?500000000LL:100000LL;// 交替切换贴近 10^9 与中等跨度
         long long maxC=0;
         for(int i=0;i<n;i++){
             coupons[i]=1+(long long)(rng()%span);
@@ -287,13 +284,13 @@ int runSelfTest(){
         for(int i=0;i<n;i++){
             prices[i]=maxC+1+(long long)(rng()%span);
         }
-        long long budget=(tc%2==0)?1000000000000000LL:100000000000LL;// 与对应值域匹配以落在矩阵内部
-        if(!checkCase("huge_rand_"+to_string(tc),prices,coupons,budget,false,false,false,0,0)){
+        long long budget=(tc%2==0)?10000000000000LL:5000000000LL;// 覆盖大预算内部临界与全买边界
+        if(!checkCase("huge_rand_"+to_string(tc),prices,coupons,budget,true,true,false,0,0)){
             return 1;
         }
     }
 
-    printf("自检通过: 10 组固定边界用例 + 300 组随机五算法暴力对拍 + 30 组中大规模四算法对拍 + 20 组超大预算/值域对拍全部一致\n");
+    printf("自检通过: 10 组固定边界用例 + 300 组随机四算法暴力对拍 + 30 组中大规模三算法对拍 + 20 组大预算四算法暴力对拍全部一致\n");
     return 0;
 }
 
@@ -302,8 +299,8 @@ void printUsage(){
     printf("用法:\n");
     printf("  coupons                                      标准输入输出模式（默认使用 bsearch）\n");
     printf("  coupons test                                 运行全套内置正确性自检与对拍\n");
-    printf("  coupons solve <file> [algo]                  读文件求解（algo: brute|heap_full|heap_lazy|bsearch|prune|all）\n");
-    printf("  coupons bench <file> [algo] [repeat] [--csv] 计时与工作量统计（algo 另支持 fast|nologk|heaps）\n");
+    printf("  coupons solve <file> [algo]                  读文件求解（algo: brute|heap_full|heap_lazy|bsearch|all）\n");
+    printf("  coupons bench <file> [algo] [repeat] [--csv] 计时与工作量统计（algo 另支持 fast|heaps）\n");
 }
 
 }// namespace
