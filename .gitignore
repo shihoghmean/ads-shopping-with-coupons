@@ -1,0 +1,29 @@
+# 构建产物
+build/
+*.o
+*.obj
+*.exe
+*.pdb
+
+# 自动生成的大规模基准测试数据（由 code/tools/gen_cases.py 按固定种子重现）
+data/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 编辑器与系统
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+
+# LaTeX 中间文件
+documents/build/
+documents/*.aux
+documents/*.log
+documents/*.out
+documents/*.toc
+documents/*.synctex.gz
+documents/png/

@@ -1,0 +1,734 @@
+% 编译：在 documents/ 目录里运行 xelatex report.tex 两遍（中间产物输出到 build/）
+\documentclass[12pt,a4paper,fontset=windows]{ctexart}
+
+\usepackage{geometry}
+\geometry{left=2.4cm,right=2.4cm,top=2.4cm,bottom=2.4cm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{colortbl}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc}
+\usepackage[nobottomtitles*]{titlesec}
+\usepackage[hidelinks]{hyperref}
+
+\setmainfont{Times New Roman}
+\setmonofont{Consolas}
+% 中文引号按 CJK 标点处理，防止 xeCJK 在引号与汉字间插入西文间距
+\xeCJKDeclareCharClass{CJK}{"2018, "2019, "201C, "201D}
+
+% PR 互评匿名阶段：封面、分工、PDF 元数据一律不含姓名、学号、真实组号与环境标识
+\hypersetup{
+  pdftitle={Shopping With Coupons: From Heap Merging to Strongly Polynomial Matrix Selection},
+  pdfauthor={},
+  pdfsubject={},
+  pdfkeywords={},
+  pdfcreator={},
+  pdfcreationdate={D:20261123180000+08'00'},
+  pdfmoddate={D:20261123180000+08'00'}
+}
+
+% 章标题沿用课程要求格式：Chapter N: Title，下配细横线分隔
+\titleformat{\section}{\raggedright\bfseries\fontsize{14}{17}\selectfont}{Chapter \thesection:}{0.85em}{}[{\color{black}\titlerule[0.9pt]}]
+\titlespacing*{\section}{0pt}{1.35em}{0.65em}
+\titleformat{\subsection}{\raggedright\bfseries\fontsize{12}{15}\selectfont}{\thesubsection}{0.7em}{}[{\color{black}\titlerule[0.4pt]}]
+\titlespacing*{\subsection}{0pt}{1.15em}{0.5em}
+\titleformat{\subsubsection}{\raggedright\bfseries}{\thesubsubsection}{0.6em}{}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{定理}
+\newtheorem{lemma}{引理}
+
+\lstdefinestyle{pseudo}{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  framerule=0.4pt,
+  rulecolor=\color{gray!45},
+  backgroundcolor=\color{gray!5},
+  xleftmargin=0.5em,
+  xrightmargin=0.5em,
+  aboveskip=0.55em,
+  belowskip=0.55em,
+  breaklines=true,
+  escapeinside={(*@}{@*)}
+}
+\lstset{style=pseudo}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\tabhead}[1]{\textbf{#1}}
+
+\pagestyle{plain}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.46em}
+\setlength{\emergencystretch}{2em}
+
+\begin{document}
+
+%=====================================================================
+% 封面页（PR 匿名版）
+%=====================================================================
+\begin{titlepage}
+\centering
+\vspace*{1.6cm}
+{\fontsize{13}{16}\selectfont Advanced Data Structures and Algorithm Analysis --- Project 5\par}
+
+\vspace{1.2cm}
+{\bfseries\fontsize{24}{31}\selectfont Shopping With Coupons:\par}
+\vspace{0.45em}
+{\bfseries\fontsize{20}{27}\selectfont From Heap Merging to Strongly Polynomial\par}
+\vspace{0.3em}
+{\bfseries\fontsize{20}{27}\selectfont Matrix Selection\par}
+
+\vspace{1.8cm}
+{\bfseries\fontsize{16}{20}\selectfont Member A\hspace{2.2em}Member B}
+
+\vspace{0.8cm}
+{\fontsize{12}{15}\selectfont Group: [Anonymous for Peer Review]}
+
+\vspace{1.0cm}
+{\bfseries\fontsize{13}{16}\selectfont Date: 2026-11-23}
+\end{titlepage}
+
+%=====================================================================
+\section{Introduction}
+
+\subsection{题目要求}
+
+商店里有 $N$ 种商品，价格为正整数 $p_1, p_2, \dots, p_N$；手头同时有 $N$ 种优惠券，面值为正整数 $c_1, c_2, \dots, c_N$，另有总预算 $D$ 元。购买规则满足四条约束：
+
+\begin{enumerate}[leftmargin=1.8em,itemsep=0.12em,topsep=0.18em]
+  \item 每种商品可以购买多次，每种优惠券也可以使用多次；
+  \item 每次购买一件商品恰好使用一张优惠券，实际支付金额为 $p_i - c_j$；
+  \item 同一个「商品--优惠券」配对 $(i, j)$ 最多只能使用一次，全过程共有 $N^2$ 种互不重复的合法购买选项；
+  \item 数据保证 $\max_j c_j < \min_i p_i$，且输入满足 $1 \le N \le 10^5$、$0 \le D \le 10^6$、$1 \le c_j < p_i \le 10^9$（题面主约束为正整数 $D$，测试中一并覆盖 $D=0$ 退化边界）。
+\end{enumerate}
+
+目标是在总花费不超过 $D$ 的前提下，先最大化购买件数 $K$，再在买满 $K$ 件的前提下最大化剩余金额 $R$。以样例 $N=4, D=30$、价格 $\{12, 20, 15, 10\}$、优惠券 $\{9, 6, 8, 7\}$ 为例：10 元商品配齐四张券花去 10 元，12 元商品配 9、8、7 三张券花去 12 元，再以 9 元券买入一件 15 元商品花去 6 元，共买 8 件、剩 2 元。
+
+\subsection{这份报告做了什么}
+
+直接把 $N^2$ 种配对展开排序，在 $N=10^5$ 时会产生 $10^{10}$ 个元素，单存储就需要约 74.5~GiB 内存，无法运行。解决这个问题的关键在于利用 $p_i - c_j$ 的笛卡尔和单调结构，在不展开矩阵的前提下直接定位最便宜的前 $K$ 个配对。
+
+本报告在同一代码框架下实现并对比了五种递进算法（暴力展开、标准 $N$ 路归并堆、前沿懒扩展堆、值域二分双指针、强多项式矩阵加权中位数剪枝），主要回答三个问题：在题面约束下哪类算法更快、排名随购买件数 $K$ 如何反转；突破预算 $D$ 或数值范围上限后，三类复杂度阶的分水岭在哪里；以及这些实测结论各自成立的边界是什么。
+
+后面三章按此展开：第 2 章做数学建模、贪心证明并给出五种算法的设计与伪代码；第 3 章展示正确性对拍、排查记录和五组基准实验结果；第 4 章推导时空复杂度，按排序、求解与单步代价拆解实测读数，并补充理论下界与模型变体讨论。
+
+%=====================================================================
+\section{Data Structure / Algorithm Specification}
+
+\subsection{数学建模与贪心正确性}
+
+将商品价格升序排为 $p_0 \le p_1 \le \dots \le p_{N-1}$，优惠券面值降序排为 $c_0 \ge c_1 \ge \dots \ge c_{N-1}$，定义 $N \times N$ 的虚拟实付价格矩阵：
+\[
+M[i][j] = p_i - c_j, \qquad 0 \le i, j < N.
+\]
+因为 $\max_j c_j < \min_i p_i$，矩阵所有元素满足 $M[i][j] \ge 1$。同时 $p_i$ 随行号不降、$-c_j$ 随列号不降，$M$ 是一张行列同时单调不降的笛卡尔和矩阵（$X+Y$ 矩阵，其中 $X_i=p_i, Y_j=-c_j$）。
+
+原问题等价于选出子集 $S \subseteq \{0,\dots,N-1\}^2$，在 $\sum_{(i,j)\in S} M[i][j] \le D$ 下使 $(|S|,\ D-\sum_{(i,j)\in S} M[i][j])$ 字典序最大。
+
+\begin{theorem}[贪心选择性质与双目标统一]
+将矩阵 $M$ 的全部 $N^2$ 个实付价格按不降顺序记为 $w_1 \le w_2 \le \dots \le w_{N^2}$。设 $K$ 为满足 $\sum_{t=1}^{K} w_t \le D$ 的最大整数（若 $w_1 > D$ 则 $K=0$），则最优购买件数必为 $K$，最优剩余金额必为 $R = D - \sum_{t=1}^{K} w_t$。
+\end{theorem}
+
+\begin{proof}
+采用交换论证\cite{clrs2022}。任取一个大小为 $k$ 的合法方案 $S$，将其元素升序排为 $s_1 \le s_2 \le \dots \le s_k$。由于 $w_1, \dots, w_k$ 是全矩阵中最小的 $k$ 个数，对任意 $t \in \{1, \dots, k\}$ 均有 $w_t \le s_t$，故
+\[
+\sum_{t=1}^{k} w_t \le \sum_{t=1}^{k} s_t \le D.
+\]
+若 $k > K$，由 $K$ 的最大性必有 $\sum_{t=1}^{k} w_t > D$，矛盾。因此合法方案件数至多为 $K$。在 $k=K$ 时，上式同时说明任何 $K$ 元方案的总花费都不小于 $\sum_{t=1}^{K} w_t$，剩余金额至多为 $D - \sum_{t=1}^{K} w_t$。选取前 $K$ 小配对同时达到两项上界。
+\end{proof}
+
+由 $M[i][j] \ge 1$ 可立即得到购买件数的上界：
+\[
+K \le \min(N^2, D).
+\]
+在题面约束 $N \le 10^5$、$D \le 10^6$ 下，$N^2 = 10^{10}$，但 $K$ 不会超过 $10^6$。这也是优先队列在题面范围内可行的原因。一旦把预算放宽到 $D = 10^{12}$ 以上，$K$ 跨过亿级，逐件弹出的算法就会失效。
+
+\subsection{五种算法总览与公平比较设计}
+
+围绕摆脱 $N^2$、压缩堆内无效元素、摆脱 $K$ 与摆脱值域 $V$ 四步递进，我们在源码文件 \code{solvers.cpp} 中实现了五个求解器，总览见表~\ref{tab:algo_overview}。
+
+\begin{table}[htbp]
+\centering
+\caption{五个求解器的设计定位与理论复杂度总览（$V = M_{\max} - M_{\min} + 1$ 为实付价整数跨度）}
+\label{tab:algo_overview}
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{3.0cm}l>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}p{2.6cm}@{}}
+\toprule
+\rowcolor{gray!12}\tabhead{标识} & \tabhead{核心范式} & \tabhead{时间复杂度} & \tabhead{总空间复杂度} & \tabhead{主要依赖参数} \\
+\midrule
+\code{brute}      & 展开全部 $N^2$ 配对排序 & $O(N^2 \log N)$ & $O(N^2)$ & 仅受限于 $N$ \\
+\code{heap\_full} & $N$ 路归并堆（全行首入堆） & $O(N\log N + K\log N)$ & $O(N)$ & 强依赖 $K$ \\
+\code{heap\_lazy} & 网格前沿懒扩展最小堆 & $O(N\log N + K\log\min(N,K))$ & $O(N)$（堆 $O(\min(N,K))$） & 依赖 $K$，$K\ll N$ 占优 \\
+\code{bsearch}    & 值域二分 + 单调双指针 & $O(N\log N + N\log(\min(V,D)+1))$ & $O(N)$ & 弱多项式，与 $K$ 无关 \\
+\code{prune}      & 矩阵加权中位数剪枝 + BFPRT & 严格最坏 $O(N\log N)$ & $O(N)$ & 强多项式，与 $V,D,K$ 无关 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+公平对比依赖两项工程约束。第一，五个求解器共享只读原始数组 \code{const vector<long long>\&}，各自拷贝后再排序；如果不拷贝而原地排序，同一批次中后面的算法面对的就是已排序数组，测出的耗时差就说不清是算法带来的，还是预处理带来的。第二，两类堆共用同一份手写 1-indexed 二叉最小堆 \code{MinHeap}（空穴法调整 + 原地替换 \code{replaceTop}）；如果一边用 \code{std::priority\_queue}、另一边手写堆，容器常数就会遮住扩展策略本身的差异。
+
+\subsection{朴素暴力与两类最小堆归并}
+
+\subsubsection{朴素展开排序（\texorpdfstring{\code{brute}}{brute}）}
+
+枚举全部 $N^2$ 对 $(i,j)$ 算出 $p_i - c_j$，调用 \code{std::sort} 升序排列后顺序扣减预算直至停机。该实现直接按定理~1 的定义计算，不依赖任何矩阵单调性或收尾公式，在 $N \le 4000$ 上作为独立真值基准参与对拍；对 $N > 4000$ 主动拒绝执行以防内存溢出。
+
+\subsubsection{标准 \texorpdfstring{$N$}{N} 路归并最小堆（\texorpdfstring{\code{heap\_full}}{heap\_full}）}
+
+排序后，矩阵每一行 $r$ 都是一条升序序列 $p_r - c_0 \le \dots \le p_r - c_{N-1}$。算法初始将全部 $N$ 个行首 $(p_r - c_0, r, 0)$ 装入最小堆，每轮取出堆顶扣减预算并推入同行下一列。
+
+实现里有两处减常数处理。因为 $p_0 \le \dots \le p_{N-1}$，初始 $N$ 个行首本身已经有序，顺序写入 1-indexed 数组后天然满足小根堆性质，只需 $O(N)$ 拷贝而不必逐个上滤。同行右移时直接调用 \code{replaceTop} 覆写堆顶后单趟下沉，省掉一次 \code{pop} 加 \code{push} 的往返。但当 $K \ll N$ 时，它依然要先装满 $N$ 个行首，且后续每次下沉的堆高始终接近 $\log_2 N$。
+
+\begin{lstlisting}[float=htbp, title={算法 1：标准 $N$ 路归并最小堆（\code{heap\_full}）}]
+sort p ascending;  sort c descending
+for r <- 0 to N - 1:
+    heap.appendSorted((p[r] - c[0], r, 0))   // 行首已有序，O(N) 直接成堆
+cnt <- 0;  rem <- D
+while not heap.empty():
+    (val, r, col) <- heap.top()
+    if val > rem: break
+    rem <- rem - val;  cnt <- cnt + 1
+    if col + 1 < N: heap.replaceTop((p[r] - c[col + 1], r, col + 1))
+    else:           heap.pop()
+return (cnt, rem)
+\end{lstlisting}
+
+\subsubsection{前沿懒扩展最小堆（\texorpdfstring{\code{heap\_lazy}}{heap\_lazy}）}
+
+为消除 $K \ll N$ 时的初始装载冗余，我们将网格组织成以 $(0,0)$ 为根的有向生成树：对任意非根格子 $(r, col)$，定义唯一父结点为
+\[
+\text{parent}(r, col) =
+\begin{cases}
+(r - 1, 0), & col = 0 \text{ 且 } r > 0,\\
+(r, col - 1), & col > 0.
+\end{cases}
+\]
+由矩阵行列单调性，子结点的实付价不小于父结点，父结点必先于子结点出堆。初始仅压入 $(0,0)$；每次弹出 $(r, col)$ 后，向右推 $(r, col+1)$，仅当 $col=0$ 时额外向下推 $(r+1, 0)$。每个格子恰有唯一父结点，既不漏也不重，无需哈希表去重（图~\ref{fig:matrix_views}(a)）。
+
+\begin{lstlisting}[float=htbp, title={算法 2：前沿懒扩展最小堆（\code{heap\_lazy}）}]
+sort p ascending;  sort c descending
+heap.push((p[0] - c[0], 0, 0));  cnt <- 0;  rem <- D
+while not heap.empty():
+    (val, r, col) <- heap.top()
+    if val > rem: break
+    rem <- rem - val;  cnt <- cnt + 1
+    hasRight <- (col + 1 < N);  hasDown <- (col == 0 and r + 1 < N)
+    if hasRight and hasDown:
+        heap.replaceTop((p[r] - c[col + 1], r, col + 1))
+        heap.push((p[r + 1] - c[0], r + 1, 0))
+    else if hasRight: heap.replaceTop((p[r] - c[col + 1], r, col + 1))
+    else if hasDown:  heap.replaceTop((p[r + 1] - c[0], r + 1, 0))
+    else:             heap.pop()
+return (cnt, rem)
+\end{lstlisting}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=0.68, >=Stealth, font=\small]
+%---- 左子图：(a) 懒扩展无重生成树 ----
+\begin{scope}[shift={(0,0)}]
+  \node[font=\bfseries\small] at (2.0, 5.25) {(a) 前沿懒扩展生成树};
+  \foreach \r/\val in {0/p_0,1/p_1,2/p_2,3/p_3} {
+    \node[left, font=\scriptsize] at (-0.06, 3.5-\r) {$\val$};
+  }
+  \foreach \c/\val in {0/-c_0,1/-c_1,2/-c_2,3/-c_3} {
+    \node[above, font=\scriptsize] at (0.5+\c, 4.08) {$\val$};
+  }
+  \fill[blue!14] (0,3) rectangle (3,4);
+  \fill[blue!14] (0,2) rectangle (2,3);
+  \fill[blue!14] (0,1) rectangle (1,2);
+  \fill[orange!28] (3,3) rectangle (4,4);
+  \fill[orange!28] (2,2) rectangle (3,3);
+  \fill[orange!28] (1,1) rectangle (2,2);
+  \fill[orange!28] (0,0) rectangle (1,1);
+  \draw[step=1.0, gray!60] (0,0) grid (4,4);
+  \foreach \y in {3.5,2.5,1.5} {
+    \draw[->, thick, blue!70!black] (0.5,\y) -- (0.5,\y-0.88);
+  }
+  \draw[->, thick, blue!70!black] (0.62,3.5) -- (1.42,3.5);
+  \draw[->, thick, blue!70!black] (1.62,3.5) -- (2.42,3.5);
+  \draw[->, thick, orange!80!black] (2.62,3.5) -- (3.42,3.5);
+  \draw[->, thick, blue!70!black] (0.62,2.5) -- (1.42,2.5);
+  \draw[->, thick, orange!80!black] (1.62,2.5) -- (2.42,2.5);
+  \draw[->, thick, orange!80!black] (0.62,1.5) -- (1.42,1.5);
+  \node[font=\scriptsize, align=center] at (2.0,-0.62) {浅蓝: 已弹出\\浅橙: 堆内前沿};
+\end{scope}
+
+%---- 中子图：(b) 值域二分双指针阶梯 ----
+\begin{scope}[shift={(6.2,0)}]
+  \node[font=\bfseries\small] at (2.0, 5.25) {(b) 值域二分单调阶梯};
+  \fill[teal!16] (0,3) rectangle (4,4);
+  \fill[teal!16] (0,2) rectangle (3,3);
+  \fill[teal!16] (0,1) rectangle (1,2);
+  \draw[step=1.0, gray!60] (0,0) grid (4,4);
+  \draw[very thick, teal!75!black] (4,4) -- (4,3) -- (3,3) -- (3,2) -- (1,2) -- (1,1) -- (0,1) -- (0,0);
+  \node[teal!65!black, font=\scriptsize\bfseries] at (1.5,3.5) {$\le T$};
+  \node[gray!75!black, font=\scriptsize] at (2.9,1.5) {$> T$};
+  \draw[->, thick, red!75!black] (3.85,2.7) -- (3.15,2.7);
+  \draw[->, thick, red!75!black] (2.85,1.7) -- (1.15,1.7);
+  \node[font=\scriptsize, align=center] at (2.0,-0.62) {指针 $j$ 随行递增左移\\单趟统计严格 $O(N)$};
+\end{scope}
+
+%---- 右子图：(c) 强多项式矩阵剪枝活性带 ----
+\begin{scope}[shift={(12.4,0)}]
+  \node[font=\bfseries\small] at (2.0, 5.25) {(c) 矩阵剪枝三段活性带};
+  \fill[blue!15] (0,3) rectangle (2,4);
+  \fill[blue!15] (0,2) rectangle (1,3);
+  \fill[yellow!35] (2,3) rectangle (4,4);
+  \fill[yellow!35] (1,2) rectangle (3,3);
+  \fill[yellow!35] (0,1) rectangle (2,2);
+  \fill[yellow!35] (0,0) rectangle (1,1);
+  \fill[gray!18] (3,2) rectangle (4,3);
+  \fill[gray!18] (2,1) rectangle (4,2);
+  \fill[gray!18] (1,0) rectangle (4,1);
+  \draw[step=1.0, gray!60] (0,0) grid (4,4);
+  \draw[very thick, blue!70!black] (2,4) -- (2,3) -- (1,3) -- (1,2) -- (0,2) -- (0,0);
+  \draw[very thick, red!70!black] (4,4) -- (4,3) -- (3,3) -- (3,2) -- (2,2) -- (2,1) -- (1,1) -- (1,0);
+  \node[font=\scriptsize] at (1.0,3.5) {$\le a$};
+  \node[font=\scriptsize] at (3.0,3.5) {活性};
+  \node[font=\scriptsize] at (3.0,0.5) {$\ge b$};
+  \node[font=\scriptsize, align=center] at (2.0,-0.62) {浅蓝: 确定买入\\浅黄: 未决活性带};
+\end{scope}
+\end{tikzpicture}
+\caption{行列单调实付价矩阵 $M[i][j]=p_i-c_j$ 在三类高效算法下的操作几何视图}
+\label{fig:matrix_views}
+\end{figure}
+
+\subsection{值域二分与单调双指针}
+
+两类堆每次只买一件，时间下界无法低于 $\Omega(K)$。改为在实付价格阈值 $T$ 上二分，就能一次性计入所有 $M[i][j] \le T$ 的配对。
+
+预先对降序数组 $c$ 计算前缀和 $\mathrm{prefC}[m] = \sum_{t=0}^{m-1} c_t$。对任意阈值 $T$，记
+\[
+\mathrm{cnt}(T) = \big|\{(i,j) : p_i - c_j \le T\}\big|, \qquad
+\mathrm{sum}(T) = \sum_{p_i - c_j \le T} (p_i - c_j).
+\]
+当行号 $i$ 从 $0$ 增至 $N-1$ 时，$p_i$ 不降，满足 $p_i - c_j \le T$ 的最大列下标 $j$ 单调不增（图~\ref{fig:matrix_views}(b)）。维护 $j$ 从 $N-1$ 单调左移，第 $i$ 行有 $m = j+1$ 个配对不超过 $T$，其总花费可在 $O(1)$ 内算成 $m \cdot p_i - \mathrm{prefC}[m]$。扫描中再加两条剪枝：遇到 $p_i - c_0 > T$ 时立即 \code{break}，累计花费超过 $D$ 时早停返回 \code{false}。
+
+位宽上，当 $N=10^5, p_i \le 10^9$ 时，全矩阵总花费最高可达 $10^{19}$，超出 64 位有符号整数上限（约 $9.22 \times 10^{18}$）；在大值域缩放实验里单价达到 $10^{15}$、全矩阵总花费约 $10^{25}$。因此前缀和与累加均采用 \code{\_\_int128}。进入二分前，先用 $O(1)$ 判掉 $M_{\min} > D$ 的零购买边界，再用 $O(N)$ 闭式公式 $N\sum p_i - N\sum c_i$ 判掉全矩阵 $N^2$ 件买光的边界。
+
+剩余情形满足 $M_{\min} \le D < \mathrm{sum}(M_{\max})$。将二分搜索区间设在 $[M_{\min},\ \min(M_{\max}-1,\ D)]$，求出满足 $\mathrm{sum}(T) \le D$ 的最大整数 $T^*$（若 $\mathrm{sum}(M_{\min}) > D$ 则记 $T^* = M_{\min}-1$）。临界价位 $T^*+1$ 上可能存在大量重复配对，收尾正确性由下述定理保证：
+
+\begin{theorem}[重复值收尾与上界收紧]
+在排除零购买与全买光后，令 $H = \min(M_{\max}-1,\ D)$，$T^*$ 为 $[M_{\min}, H]$ 中满足 $\mathrm{sum}(T) \le D$ 的最大整数（若无则取 $M_{\min}-1$）。记剩余预算 $R_0 = D - \mathrm{sum}(T^*)$，则原问题最优解恒为
+\[
+K = \mathrm{cnt}(T^*) + \left\lfloor \frac{R_0}{T^* + 1} \right\rfloor, \qquad
+R = R_0 \bmod (T^* + 1).
+\]
+\end{theorem}
+
+\begin{proof}
+分两种情况。情况一：$\mathrm{sum}(T^* + 1) > D$（当 $T^* < H$ 或 $H = M_{\max}-1$ 时必成立）。设矩阵中实付价恰好等于 $T^*+1$ 的配对共有 $q$ 个，则
+\[
+q \cdot (T^* + 1) = \mathrm{sum}(T^* + 1) - \mathrm{sum}(T^*) > D - \mathrm{sum}(T^*) = R_0.
+\]
+因 $T^*+1 \ge 1$ 且 $q$ 为整数，必有 $q \ge \lfloor R_0 / (T^*+1) \rfloor + 1$。即价位为 $T^*+1$ 的配对一定足够补买 $\Delta = \lfloor R_0/(T^*+1) \rfloor$ 件；买完后余钱 $R_0 \bmod (T^*+1) < T^*+1$，再也买不起任何剩余配对。
+
+情况二：$T^* = H = D < M_{\max}-1$ 且 $\mathrm{sum}(D+1) \le D$（对应价格在 $D$ 附近出现大断层）。此时所有 $\le D$ 的配对已全部买入，剩余未买配对价格均 $\ge D+1 > D \ge R_0$，一件也买不起。而公式算出 $\lfloor R_0/(D+1) \rfloor = 0$、$R_0 \bmod (D+1) = R_0$，与真实最优解一致。
+\end{proof}
+
+由于闭区间 $[M_{\min}, H]$ 最多包含 $L = \min(V-1,\ D - M_{\min} + 1) \le \min(V, D)$ 个候选整数（其中 $V = M_{\max}-M_{\min}+1 \ge 1$），二分轮数至多为 $\lceil \log_2(\min(V, D)+1) \rceil$ 轮。当矩阵全相等时 $V=1$、$H < M_{\min}$，循环执行 0 轮后直接进入收尾公式。完整伪代码见算法~3。
+
+\begin{lstlisting}[float=htbp, title={算法 3：值域二分 + 单调双指针 + 前缀和（\code{bsearch}）}]
+function checkBudget(T):
+    j <- N - 1;  sum <- 0                       // 128 位累加防溢出
+    for i <- 0 to N - 1:
+        if p[i] - c[0] > T: break               // 后续行最小实付价均超过 T
+        while j >= 0 and p[i] - c[j] > T: j <- j - 1
+        m <- j + 1;  sum <- sum + m * p[i] - prefC[m]
+        if sum > D: return false                // 超预算早停
+    return true
+
+sort p ascending;  sort c descending;  build prefC
+if p[0] - c[0] > D: return (0, D)
+totalAll <- N * sum(p) - N * prefC[N]
+if totalAll <= D: return (N * N, D - totalAll)
+
+lo <- p[0] - c[0];  hi <- min(p[N - 1] - c[N - 1] - 1, D);  bestT <- lo - 1
+while lo <= hi:
+    mid <- lo + floor((hi - lo) / 2)
+    if checkBudget(mid): bestT <- mid;  lo <- mid + 1
+    else:                hi <- mid - 1
+(cnt, sum) <- fullTwoPointerCountAndSum(bestT)  // 对 bestT 完整扫一次取精确 cnt 与 sum
+rem0 <- D - sum;  nextP <- bestT + 1
+return (cnt + floor(rem0 / nextP), rem0 mod nextP)
+\end{lstlisting}
+
+\subsection{理论拓展：强多项式矩阵加权中位数剪枝}
+
+算法~3 的轮数随 $\log \min(V, D)$ 增长，属于弱多项式时间；一旦数值换作任意精度实数，值域二分将无法在有限步内停机。为在纯比较模型下做到与 $V, D, K$ 全部无关，我们把 Johnson 与 Mizoguchi（1978）在 $X+Y$ 矩阵中选第 $k$ 小的加权中位数剪枝方法\cite{jm1978}改造为预算约束版本（\code{prune}），使其最坏时间严格落在 $O(N\log N)$。
+
+算法在排除零购买与全买光后，维护每行的活性列区间 $[\text{leftCol}[r], \text{rightCol}[r])$（初值 $[0, N)$）与活性行集合 $\mathcal{A}$，并保持三段划分不变式（图~\ref{fig:matrix_views}(c)）：存在开区间 $(a, b)$ 使得
+\begin{enumerate}[leftmargin=1.8em,itemsep=0.1em,topsep=0.15em]
+  \item 左侧 $[0, \text{leftCol}[r])$ 恰为第 $r$ 行 $\le a$ 的元素，且全矩阵 $\le a$ 的总花费不超过 $D$；
+  \item 右侧 $[\text{rightCol}[r], N)$ 恰为第 $r$ 行 $\ge b$ 的元素，且全矩阵 $< b$ 的总花费严格大于 $D$（初值 $b=+\infty$，此时全矩阵总花费 $>D$）；
+  \item 活性带 $[\text{leftCol}[r], \text{rightCol}[r])$ 恰为第 $r$ 行落在 $(a, b)$ 内的未决元素。
+\end{enumerate}
+
+每轮对每个活性行 $r \in \mathcal{A}$ 取区间右中点 $\text{mid}_r = \text{leftCol}[r] + \lfloor w_r / 2 \rfloor$（$w_r = \text{rightCol}[r] - \text{leftCol}[r]$），构造带权项 $(v_r, w_r) = (M[r][\text{mid}_r], w_r)$，在所有活性行中求满足
+\[
+\sum_{v_r \le x} w_r \ge \frac{W}{2} \quad \text{且} \quad \sum_{v_r \ge x} w_r \ge \frac{W}{2} \qquad \Big(W = \sum_{r\in\mathcal{A}} w_r\Big)
+\]
+的加权中位数 $x$。随后在活性行上用两条单调指针分别定位每行第一个 $\ge x$ 的列下标 $p_1[r]$ 与第一个 $> x$ 的列下标 $p_2[r]$，结合已结算行算出全矩阵严格小于 $x$ 与不超过 $x$ 的花费 $\mathrm{sum}_{<x}$ 和 $\mathrm{sum}_{\le x}$，进入三路分支：
+\begin{itemize}[leftmargin=1.6em,itemsep=0.12em,topsep=0.12em]
+  \item 若 $\mathrm{sum}_{<x} > D$：令 $\text{rightCol}[r] \leftarrow p_1[r]$ 淘汰所有 $\ge x$ 的活性元素（更新 $b \leftarrow x$）；
+  \item 若 $\mathrm{sum}_{\le x} \le D$：令 $\text{leftCol}[r] \leftarrow p_2[r]$ 将所有 $\le x$ 并入买入区并淘汰（更新 $a \leftarrow x$）；
+  \item 若 $\mathrm{sum}_{<x} \le D < \mathrm{sum}_{\le x}$：命中唯一跨越预算的临界价 $x$。令 $R_0 = D - \mathrm{sum}_{<x}$，与定理~2 情况一同理，价位等于 $x$ 的配对数 $q$ 满足 $q\cdot x = \mathrm{sum}_{\le x} - \mathrm{sum}_{<x} > R_0$，即 $q \ge \lfloor R_0/x \rfloor + 1$，直接返回 $(\mathrm{cnt}_{<x} + \lfloor R_0/x \rfloor,\ R_0 \bmod x)$。
+\end{itemize}
+
+任一行收缩到 $\text{leftCol}[r] = \text{rightCol}[r]$ 时，它对后续所有 $x \in (a, b)$ 的贡献恒定为前 $\text{leftCol}[r]$ 列，立刻结算进 \code{fixedCnt}/\code{fixedSum} 并从 $\mathcal{A}$ 移除。此外，循环必然在活性带清空之前命中第三分支：因为初始已排除全买光，若 $\mathcal{A}$ 变空，则开区间 $(a, b)$ 内无矩阵元素，全矩阵 $<b$ 与 $\le a$ 为同一元素集，与不变式 $\mathrm{sum}(\le a) \le D < \mathrm{sum}(<b)$ 矛盾。
+
+\begin{lemma}[四分之一淘汰界与严格线性加权中位数]
+未命中第三分支时，下一轮剩余活性元素总数至多为 $\frac{3}{4}W$，算法总轮数不超过 $\lfloor \log_{4/3}(N^2) \rfloor + 1$。采用无权 BFPRT 选枢轴加三路划分的带权选择，单轮耗时严格最坏 $O(N)$。
+\end{lemma}
+
+\begin{proof}
+对任一活性行 $r$，取 $\text{mid}_r = \text{leftCol}[r] + \lfloor w_r / 2 \rfloor$ 后，该行活性区间中满足 $\le v_r$ 的元素至少有 $\lfloor w_r/2 \rfloor + 1 > w_r/2$ 个，满足 $\ge v_r$ 的元素至少有 $\lceil w_r/2 \rceil \ge w_r/2$ 个。对所有 $v_r \le x$ 的行求和，活性带中至少有 $\frac{1}{2}\sum_{v_r \le x} w_r \ge \frac{W}{4}$ 个元素 $\le x$；对称地，至少有 $\frac{W}{4}$ 个元素 $\ge x$。故前两分支每轮均至少淘汰 $\frac{W}{4}$ 个活性元素。因每轮结束前 $W$ 至少缩小至 $\frac{3}{4}W$ 且 $W \ge 1$ 为整数，至多经过 $\lfloor \log_{4/3}(N^2) \rfloor + 1$ 轮必终止。
+
+单轮求加权中位数采用 BFPRT 5-分组中位数的中位数\cite{bfprt1973}。\textbf{选划分枢轴必须走无权中位数（按元素个数计）}，再做荷兰国旗三路划分并同步累计左段与等值段权重，按权重决定进入左段、返回枢轴或进入右段。如果错按权重选枢轴，一个权重极大的单元素若处在值域角落，按个数计的划分就会极度失衡并退化为 $O(m^2)$。按无权 BFPRT 选枢轴，由 CLRS 第 9.3 节的标准界\cite{clrs2022}，严格小于与严格大于枢轴的两段元素个数均不超过 $\frac{7}{10}m + 6$（计入中位数所在组与末尾不足 5 元残组的偏置）；配合小规模基例（代码中 $m \le 10$ 直接插入排序；理论分析取固定常数阈值如 $m \le 140$ 时直接排序），递推 $T(m) \le T(\lceil m/5 \rceil) + T(\lfloor 7m/10 \rfloor + 6) + O(m)$ 严格满足最坏线性时间 $O(m)$。三路划分同时将等值元素并入中间段，保证平地分布不退化。
+\end{proof}
+
+\begin{lstlisting}[float=htbp, title={算法 4：强多项式矩阵加权中位数剪枝（\code{prune}）}]
+sort p ascending;  sort c descending;  build prefC;  check 0-buy / buy-all
+leftCol[0..N-1] <- 0;  rightCol[0..N-1] <- N;  active <- {0..N-1}
+fixedCnt <- 0;  fixedSum <- 0
+while active is not empty:
+    items <- [(p[r] - c[leftCol[r] + floor(w_r/2)], w_r) for r in active]
+    x <- selectWeightedBFPRT(items, ceil(sum(w_r) / 2))    // 确定性 O(|active|)
+    // 双指针在 active 上求每行首个 >=x 的列 p1[r] 与首个 >x 的列 p2[r]，同步汇总 <x 与 <=x 花费
+    (p1, p2, cntLt, sumLt, sumLe) <- twoPointerScan(active, x, fixedCnt, fixedSum)
+    if sumLt > D:
+        for r in active: rightCol[r] <- p1[r]              // 淘汰 >= x
+        settleAndShrink(active, leftCol, rightCol, fixedCnt, fixedSum)
+    else if sumLe <= D:
+        for r in active: leftCol[r] <- p2[r]               // 买入并淘汰 <= x
+        settleAndShrink(active, leftCol, rightCol, fixedCnt, fixedSum)
+    else:                                                  // 必命中 sumLt <= D < sumLe
+        rem0 <- D - sumLt
+        return (cntLt + floor(rem0 / x), rem0 mod x)
+\end{lstlisting}
+
+%=====================================================================
+\section{Testing Results}
+
+\subsection{实验环境与计时口径}
+
+全部编译、对拍与测速在同一台 64 位 Windows 主机上完成，使用 GCC（C++17）以固定编译参数 \code{-O2 -std=c++17 -Wall -Wextra} 构建，零警告通过。输入读取采用标准 C 文件流快读，计时沿用标准库 \code{clock()}（本机 \code{CLOCKS\_PER\_SEC = 1000}，滴答粒度 1~ms）。
+
+为压低 1~ms 量化误差与系统调度抖动，\code{coupons bench} 对每组输入重复执行 \code{repeat} 次并取均值，每次重复都传入未排序原始数组。重复次数按单次耗时分档设置：实验族 A 中 \code{brute} 取 5 次（$N=1000$）与 3 次（$N=2000$），其余算法按规模从 $N=1000$ 到 $10^5$ 依次取 50、30、30、25、15、10、10 次；实验族 B 均取 10 次；实验族 C 中常规分布取 10 次，较快的 \code{D3}/\code{D4} 取 15 次；实验族 D 在 $D=10^6,10^7,10^{12},10^{14}$ 取 10 次，$D=10^8$ 全算法取 5 次，$D=10^{10}$ 全算法取 2 次；实验族 E 均取 15 次。
+
+口径局限先交代两处：一是毫秒数仅在本机、本批次、固定 \code{-O2} 下横向可比，换机器或换优化级别后绝对值会变；二是对单次低于 0.05~ms 的极小用例，重复 50 次仍可能触及滴答下限，此时需以与机器无关的操作计数 \code{ops} 和轮数 \code{rounds} 为主。
+
+\subsection{功能测试、边界用例与四层自动对拍}
+
+主程序通过 \code{coupons test} 内置 360 组自动校验。第一层为 10 组手工边界用例，全部五算法一致通过，详见表~\ref{tab:fixed_cases}。
+
+\begin{table}[htbp]
+\centering
+\caption{手工功能与边界测试用例汇总（五算法逐项校验一致）}
+\label{tab:fixed_cases}
+\footnotesize
+\setlength{\tabcolsep}{3.0pt}
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{4.9cm}lll@{}}
+\toprule
+\rowcolor{gray!12}\tabhead{用例} & \tabhead{测试目的与输入（$p;\ c;\ D$）} & \tabhead{期望} & \tabhead{实际} & \tabhead{状态} \\
+\midrule
+\code{T01\_sample} & 题面样例：$\{12,20,15,10\};\ \{9,6,8,7\};\ 30$ & \code{8 2} & \code{8 2} & 通过 \\
+\code{T02\_single} & $N=1$ 且余额清零：$\{100\};\ \{99\};\ 1$ & \code{1 0} & \code{1 0} & 通过 \\
+\code{T03\_zero} & 零购买边界：$\{10,12,15\};\ \{5,4,3\};\ 4$ & \code{0 4} & \code{0 4} & 通过 \\
+\code{T04\_all} & 买光全矩阵：$\{10,12\};\ \{9,8\};\ 100$ & \code{4 90} & \code{4 90} & 通过 \\
+\code{T05\_eq\_part} & 全等平地不整除：$\{10\}^4;\ \{7\}^4;\ 20$ & \code{6 2} & \code{6 2} & 通过 \\
+\code{T06\_eq\_exact} & 全等平地全买光：$\{10\}^3;\ \{7\}^3;\ 27$ & \code{9 0} & \code{9 0} & 通过 \\
+\code{T07\_gap} & 价格大断层测上界收紧：$\{10,1000\};\ \{9,8\};\ 100$ & \code{2 97} & \code{2 97} & 通过 \\
+\code{T08\_tie} & 临界价 3 重复三次：$\{10,11,12\};\ \{9,8,7\};\ 10$ & \code{4 2} & \code{4 2} & 通过* \\
+\code{T09\_1e9} & 贴近 $10^9$ 上限：$\{10^9{-}i\}_{i=0}^2$; $\{10^9{-}3{-}i\}_{i=0}^2$; $10$ & \code{4 2} & \code{4 2} & 通过* \\
+\code{T10\_1e12} & 超大预算全买：$\{10^8{+}\{0,1,5\}\}$; $\{10^8{-}\{1,2,10\}\}$; $10^{12}$ & \code{9 999999999943} & \code{9 999999999943} & 通过* \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.25em}
+{\scriptsize 注：标「*」的三条用例初版手算预期有误，复算后修正预期，五个算法初测输出均与正确值一致（详见 3.3 节）。}
+\end{table}
+
+随后 \code{coupons test} 按固定种子 20261123 运行三层自动对拍：
+\begin{enumerate}[leftmargin=1.8em,itemsep=0.1em,topsep=0.15em]
+  \item \textbf{300 组随机小规模五算法对拍}（$N \in [1, 80]$）：轮换均匀分布、极小值域高重复、大断层、贴近 $10^9$ 四类分布，并穿插 $D=0$ 与买光全矩阵预算，四个高效算法均以独立 \code{brute} 为真值，300/300 全过；
+  \item \textbf{30 组中大规模四算法对拍}（$N \in [500, 3000], D \le 10^6$）：两类堆、二分与剪枝逐项一致，30/30 全过；
+  \item \textbf{20 组超大预算与超大值域对拍}（$N=2000$，$D$ 与跨度最高 $10^{15}$）：\code{bsearch} 与 \code{prune} 逐位一致，20/20 全过。
+\end{enumerate}
+
+此外，\code{code/samples/} 下四组样例文件经标准输入重定向 \code{coupons < sample.in} 测试，输出与同名 \code{.out} 文件逐字节一致。
+
+\subsection{排查记录：手算预期偏差与短测抖动复核}
+
+测试与基准阶段遇到过两处真实异常。
+
+\textbf{第一处：手算预期出错。}首次编写 \code{T08}、\code{T09} 与 \code{T10} 时，我们在纸上列出 $N=3$ 矩阵的前 4 小实付价 $1,2,2,3$，心算把总和算成了 10（将 \code{T08} 预期余额写成 0、\code{T09} 写成 1），又把 \code{T10} 的全矩阵总花费 57 算成了 54。首次编译运行 \code{coupons test} 立刻停在 \code{T08} 报错：\code{brute 得到 (4,2)，与 expected 的 (4,0) 不一致}。逐格复算确认暴力与四个高效算法均无误，错在手算预期。连 $N=3$ 的小矩阵手算都容易看偏，仅靠手算样例无法保证正确性，必须依赖独立暴力实现充当真值。
+
+\textbf{第二处：短测抖动险些误归因。}第一轮以 \code{repeat=5} 跑实验族 B 时，\code{K6\_xlarge} 上 \code{heap\_lazy} 测得核心耗时 11.57~ms，慢于 \code{heap\_full} 的 5.49~ms。当时准备将其归因成「动态扩容叠加首列二次入堆」，但核对操作步数（100.4 万对 110.5 万）发现步数并未反超。随后把各族 \code{repeat} 拉高重测，\code{heap\_lazy} 在 \code{K6\_xlarge} 落回 4.92~ms，快于 \code{heap\_full} 的 5.36~ms，前次 11.57~ms 实为 5 轮短测里的单次调度毛刺。做性能归因前必须先拿与机器无关的 \code{ops} 核对方向，方向矛盾时先加大重复次数复测。
+
+\subsection{规模扩展与购买量梯度实验}
+
+由 \code{code/tools/gen\_cases.py}（固定种子 20261123）生成五大实验族。实验族 A 固定 $D=10^6$ 与低价高购买量分布，将 $N$ 从 $1000$ 扩至 $10^5$，实测见表~\ref{tab:scale} 与图~\ref{fig:scale}。
+
+\begin{table}[htbp]
+\centering
+\caption{实验族 A：规模扩展实测（$D=10^6$，低价分布；单位 ms，格式为「总耗时 / 求解耗时」）}
+\label{tab:scale}
+\footnotesize
+\begin{tabular}{@{}rrrcrrr@{}}
+\toprule
+\rowcolor{gray!12}\tabhead{$N$} & \tabhead{购买件数 $K$} & \tabhead{\code{brute}} & \tabhead{\code{heap\_full}} & \tabhead{\code{heap\_lazy}} & \tabhead{\code{bsearch}} & \tabhead{\code{prune}} \\
+\midrule
+1\,000   & 30\,157  & 70.40 / 0.00  & 0.44 / 0.38  & 0.56 / 0.52  & 0.02 / 0.00  & 0.20 / 0.14 \\
+2\,000   & 47\,113  & 278.33 / 0.00 & 0.77 / 0.45  & 0.73 / 0.60  & 0.10 / 0.00  & 0.37 / 0.23 \\
+5\,000   & 88\,775  & ---           & 1.50 / 0.77  & 1.70 / 1.00  & 0.80 / 0.00  & 1.33 / 0.58 \\
+10\,000  & 139\,788 & ---           & 2.48 / 1.10  & 2.40 / 0.86  & 1.48 / 0.16  & 2.84 / 1.15 \\
+20\,000  & 208\,094 & ---           & 4.13 / 1.08  & 4.13 / 1.20  & 3.07 / 0.07  & 4.93 / 2.03 \\
+50\,000  & 388\,381 & ---           & 8.70 / 2.10  & 8.70 / 1.94  & 7.70 / 0.21  & 12.00 / 4.70 \\
+100\,000 & 629\,285 & ---           & 16.70 / 3.36 & 16.40 / 2.82 & 15.10 / 0.52 & 25.30 / 10.22 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.98\textwidth]{results/figures/fig1_scale.png}
+\caption{实验族 A：规模 $N$ 从 $10^3$ 增至 $10^5$ 时的总耗时 (a) 与剔除排序后的核心求解耗时 (b)}
+\label{fig:scale}
+\end{figure}
+
+表~\ref{tab:scale} 中，\code{brute} 在 $N=2000$ 时已达 278.33~ms，比 \code{bsearch} 慢超过两千倍，耗时几乎全在 $4\times 10^6$ 个配对的排序上。在 $N=10^5, K=629\,285$ 时，四个高效算法总耗时落在 15--25~ms；剔除排序后差距立刻拉开：\code{bsearch} 仅需 0.52~ms，比 \code{heap\_lazy}（2.82~ms）快 5.4 倍，比 \code{heap\_full}（3.36~ms）快 6.4 倍，比 \code{prune}（10.22~ms）快 19.5 倍。
+
+实验族 B 固定 $N=10^5, D=10^6$，通过改变实付价区间将实际购买件数 $K$ 从 111 扫到 $10^6$，实测见表~\ref{tab:ksweep} 与图~\ref{fig:ksweep}。
+
+\begin{table}[htbp]
+\centering
+\caption{实验族 B：购买量 $K$ 梯度实测（$N=10^5, D=10^6$，列值为核心求解耗时 \code{solve\_ms} / 步数 \code{ops}）}
+\label{tab:ksweep}
+\footnotesize
+\begin{tabular}{@{}lrcccc@{}}
+\toprule
+\rowcolor{gray!12}\tabhead{档位} & \tabhead{件数 $K$} & \tabhead{\code{heap\_full}} & \tabhead{\code{heap\_lazy}} & \tabhead{\code{bsearch}} & \tabhead{\code{prune}} \\
+\midrule
+\code{K1\_tiny}   & 111        & 0.60 ms / 100K  & 0.10 ms / 118   & 0.81 ms / 1.20M & 11.04 ms / 3.32M \\
+\code{K2\_small}  & 1\,248     & 0.41 ms / 101K  & 0.00 ms / 1.5K  & 1.01 ms / 1.30M & 11.62 ms / 3.29M \\
+\code{K3\_mid1}   & 19\,470    & 0.61 ms / 121K  & 0.20 ms / 21K   & 0.62 ms / 1.20M & 10.24 ms / 3.16M \\
+\code{K4\_mid2}   & 94\,517    & 0.81 ms / 197K  & 0.81 ms / 97K   & 0.72 ms / 1.00M & 9.70 ms / 3.11M \\
+\code{K5\_large}  & 630\,295   & 3.44 ms / 740K  & 3.36 ms / 640K  & 0.62 ms / 0.90M & 9.33 ms / 2.93M \\
+\code{K6\_xlarge} & 1\,000\,000 & 5.36 ms / 1.10M & 4.92 ms / 1.00M & 0.41 ms / 0.51M & 8.63 ms / 2.65M \\
+\code{K7\_max1e6} & 1\,000\,000 & 5.63 ms / 1.10M & 4.29 ms / 1.00M & 0.11 ms / 0.20M & 4.87 ms / 1.12M \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.98\textwidth]{results/figures/fig2_k_sweep.png}
+\caption{实验族 B：核心求解耗时随购买件数 $K$ 的反转 (a) 与排序/求解占比拆解 (b)}
+\label{fig:ksweep}
+\end{figure}
+
+当 $K \le 2\times 10^4$ 时，\code{heap\_lazy} 核心步数仅百级到两万级，求解耗时 0.00--0.20~ms，快过所有对手。到了 $K = 94\,517$（\code{K4\_mid2}），\code{bsearch}（0.72~ms）开始反超两类堆（0.81~ms）。跨过 $10^5$ 后，两类堆的求解耗时升至 4.3--5.6~ms，而 \code{bsearch} 反而降到 0.11--0.62~ms。图~\ref{fig:ksweep}(b) 同时给出总耗时拆解：在 \code{K1}--\code{K4} 上，排序占两类堆与 \code{bsearch} 总耗时的 95\% 以上，占 \code{prune} 总耗时的 61\%--65\%。
+
+\subsection{分布敏感度与两大拓展实验}
+
+实验族 C 在 $N=10^5, D=10^6$ 下测五种分布，结果见表~\ref{tab:dist}。在 \code{D3\_all\_equal} 与 \code{D4\_step\_3levels} 上，矩阵分别仅有 1 种和 9 种不同实付价：\code{prune} 只跑 1 轮与 2 轮便命中临界价退出；但 \code{bsearch} 在 \code{D4} 上虽跑了 19 轮，借助早停仅花 0.84~ms，依然快过 2 轮 \code{prune} 的 3.90~ms。
+
+\begin{table}[htbp]
+\centering
+\caption{实验族 C：五种典型分布下的核心求解耗时与轮数（$N=10^5, D=10^6$）}
+\label{tab:dist}
+\footnotesize
+\setlength{\tabcolsep}{4.2pt}
+\begin{tabular}{@{}lrcccc@{}}
+\toprule
+\rowcolor{gray!12}\tabhead{分布用例} & \tabhead{件数 $K$} & \tabhead{\code{heap\_full} (ms)} & \tabhead{\code{heap\_lazy} (ms)} & \tabhead{\code{bsearch} (ms/轮)} & \tabhead{\code{prune} (ms/轮)} \\
+\midrule
+\code{D1\_uniform\_cheap} & 278\,552   & 2.13 & 1.22 & 0.81 / 11 & 11.15 / 12 \\
+\code{D2\_uniform\_exp}   & 492        & 0.20 & 0.10 & 1.12 / 19 & 10.14 / 23 \\
+\code{D3\_all\_equal}     & 200\,000   & 1.77 & 0.86 & 0.00 / 0  & 2.50 / 1 \\
+\code{D4\_step\_3levels}  & 1\,000\,000 & 5.67 & 4.42 & 0.84 / 19 & 3.90 / 2 \\
+\code{D5\_heavy\_gap}     & 178\,629   & 1.96 & 1.12 & 0.92 / 20 & 8.09 / 17 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+实验族 D 突破题面 $D \le 10^6$ 上限，固定 $N=10^5$ 将预算推高至 $10^{14}$（表~\ref{tab:huge_budget}、图~\ref{fig:huge_budget}）。在 $D=10^{10}$（$K=4\,811\,922$）时，两类堆的核心耗时已达 261--283~ms，比 \code{bsearch}（2.00~ms）慢超 130 倍；到 $D=10^{14}$（$K \approx 22.33$ 亿）时，按堆每百万次弹出约 55~ms 外推需要两分钟以上，而 \code{bsearch} 与 \code{prune} 仅需 44.1~ms 与 96.9~ms。
+
+\begin{table}[htbp]
+\centering
+\caption{实验族 D：超大预算拓展（$N=10^5$，$D$ 推高至 $10^{14}$；总耗时 / 求解耗时，单位 ms）}
+\label{tab:huge_budget}
+\footnotesize
+\begin{tabular}{@{}rrcccc@{}}
+\toprule
+\rowcolor{gray!12}\tabhead{预算 $D$} & \tabhead{实际购买件数 $K$} & \tabhead{\code{heap\_full}} & \tabhead{\code{heap\_lazy}} & \tabhead{\code{bsearch}} & \tabhead{\code{prune}} \\
+\midrule
+$10^6$    & 10\,479         & 25.2 / 0.93    & 25.3 / 0.31    & 26.5 / 1.43  & 46.8 / 22.17 \\
+$10^7$    & 48\,909         & 26.6 / 2.54    & 26.1 / 2.23    & 27.3 / 1.22  & 44.8 / 20.00 \\
+$10^8$    & 224\,327        & 34.8 / 11.60   & 35.4 / 11.19   & 26.2 / 1.02  & 44.6 / 20.37 \\
+$10^{10}$ & 4\,811\,922     & 307.0 / 282.96 & 284.5 / 261.46 & 27.0 / 2.00  & 44.0 / 20.47 \\
+$10^{12}$ & 103\,492\,063   & ---            & ---            & 28.2 / 4.35  & 54.1 / 29.94 \\
+$10^{14}$ & 2\,233\,468\,109 & ---            & ---            & 44.1 / 19.98 & 96.9 / 72.47 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{results/figures/fig3_huge_budget.png}
+\caption{实验族 D：突破题面 $D \le 10^6$ 限制后，堆算法与非 $K$ 依赖算法的量级分化}
+\label{fig:huge_budget}
+\end{figure}
+
+实验族 E 固定 $N=5\times 10^4$（基线优惠券 $1$--$5000$、价格 $5001$--$10000$、预算 $5\times 10^7$），将同一组输入的 $p, c, D$ 整体乘以 $S \in \{1, 10^3, 10^6, 10^9, 10^{11}\}$。矩阵相对序结构与最优购买件数（恒为 $665\,654$ 件）完全不变，唯一放大的只有值域比特长度（最大单价扩至 $10^{15}$，全矩阵总花费达 $10^{25}$ 量级）。结果见表~\ref{tab:huge_value} 与图~\ref{fig:huge_value}。
+
+\begin{table}[htbp]
+\centering
+\caption{实验族 E：等比例缩放控制变量实测（$N=5\times 10^4$，最优件数恒为 $665\,654$）}
+\label{tab:huge_value}
+\footnotesize
+\setlength{\tabcolsep}{4.8pt}
+\begin{tabular}{@{}rrrrrrr@{}}
+\toprule
+\rowcolor{gray!12}\tabhead{缩放 $S$} & \tabhead{\code{bsearch} 轮} & \tabhead{\code{bsearch} 步数} & \tabhead{\code{bsearch} 求解(ms)} & \tabhead{\code{prune} 轮} & \tabhead{\code{prune} 步数} & \tabhead{\code{prune} 求解(ms)} \\
+\midrule
+$1$       & 14 & 710\,883    & 0.674 & 16 & 1\,803\,783 & 6.174 \\
+$10^3$    & 24 & 1\,221\,291 & 0.800 & 16 & 1\,803\,783 & 6.237 \\
+$10^6$    & 34 & 1\,731\,827 & 1.086 & 16 & 1\,803\,783 & 6.061 \\
+$10^9$    & 44 & 2\,242\,531 & 1.550 & 16 & 1\,803\,783 & 6.650 \\
+$10^{11}$ & 49 & 2\,497\,631 & 1.783 & 16 & 1\,803\,783 & 6.217 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.98\textwidth]{results/figures/fig4_value_scaling.png}
+\caption{实验族 E：等比例缩放下迭代轮数的分化 (a) 与步数多出但耗时未反转 (b)}
+\label{fig:huge_value}
+\end{figure}
+
+数值每扩大 $10^3$ 倍，\code{bsearch} 的二分轮数精确增加 $10 \approx \log_2 10^3$ 轮，步数从 71 万涨到 250 万，求解耗时单调升至 1.78~ms；\code{prune} 的轮数恒为 16、步数逐位恒等于 $1\,803\,783$，完全不受值域膨胀影响。反直觉的是，在 $S=10^{11}$ 处 \code{bsearch} 的步数已比 \code{prune} 多出 38.5\%，实测求解耗时（1.78~ms）仍比 \code{prune}（6.22~ms）快 3.5 倍。
+
+%=====================================================================
+\section{Analysis and Comments}
+
+\subsection{时间与空间复杂度推导}
+
+本节逐一推导五个求解器的渐近阶与精确内存占用（容量均按二进制 $1~\text{MiB}=2^{20}$~B、$1~\text{GiB}=2^{30}$~B 换算）。
+
+\begin{enumerate}[leftmargin=1.6em,itemsep=0.3em,topsep=0.18em]
+  \item \textbf{\code{brute}：}生成 $N^2$ 个实付价需 $\Theta(N^2)$，全排序需 $\Theta(N^2\log(N^2)) = \Theta(N^2\log N)$，扫描至多 $N^2$ 步；总时间 $\Theta(N^2\log N)$。数组 \code{all} 存 $N^2$ 个 8 字节整数，空间 $\Theta(N^2)$，$N=10^5$ 时约 74.5~GiB。
+
+  \item \textbf{\code{heap\_full}：}两次排序需 $O(N\log N)$，有序行首线性装堆耗时 $\Theta(N)$；主循环共弹出 $K \le \min(N^2, D)$ 次，每次下沉深度至多 $\lfloor \log_2 N \rfloor$，总时间 $O(N\log N + K\log N)$。空间为拷贝数组 $p, c$（共 $16N$~B）加 1-indexed 堆数组（每结点 16~B，共 $16N$~B），合计约 $32N$~B（$N=10^5$ 时约 3.05~MiB），阶为 $O(N)$。
+
+  \item \textbf{\code{heap\_lazy}：}排序同为 $O(N\log N)$。每轮弹出 $(r, col)$ 至多让堆净增 1 个结点，且每行至多有一个活跃前沿在堆里，故堆上限 $H_{\max} \le \min(N, K+1)$。核心求解时间 $O(K\log\min(N, K))$，总时间 $O(N\log N + K\log\min(N, K))$。堆本身占 $O(\min(N, K))$，连同输入排序数组总空间 $O(N)$。
+
+  \item \textbf{\code{bsearch}：}排序 $O(N\log N)$，构建 \code{prefC} 需 $\Theta(N)$。在 \code{checkBudget(T)} 中，外层 $i$ 最多迭代 $N$ 次，内层指针 $j$ 从 $N-1$ 只减不增、总左移次数至多 $N$ 次，单次判定严格 $O(N)$。二分搜索区间含至多 $\min(V, D)$ 个整数，轮数不超过 $\lceil \log_2(\min(V, D)+1) \rceil$，加末尾一次完整扫描，总时间 $O(N\log N + N\log(\min(V, D)+1))$。空间为 $p, c$（$16N$~B）加 16 字节宽 \code{prefC}（$16N$~B），合计约 $32N$~B（$N=10^5$ 时约 3.05~MiB），阶为 $O(N)$。
+
+  \item \textbf{\code{prune}：}排序与 \code{prefC} 需 $O(N\log N)$。由引理~1，每轮活性元素数 $W$ 至少缩小至 $\frac{3}{4}W$，总轮数不超过 $\lfloor \log_{4/3}(N^2) \rfloor + 1$。单轮内构造活性行中点表 $O(m)$，无权 BFPRT 选枢轴加三路带权选择满足 $T(m) \le T(\lceil m/5 \rceil) + T(\lfloor 7m/10 \rfloor + 6) + O(m) = O(m)$，单调双指针扫描耗时 $O(N)$（随活性行数萎缩进一步下降）。轮数乘单轮代价，最坏总时间严格为 $O(N\log N)$，不依赖 $V, D, K$。额外空间为 6 个 \code{int} 辅助数组（$24N$~B）、\code{WeightedItem} 缓冲（$16N$~B）与 BFPRT 中位数递归栈（至多 $2N$~B），连同排序数组与 \code{prefC} 共约 $74N$~B（$N=10^5$ 时约 7.06~MiB），阶为 $O(N)$。
+\end{enumerate}
+
+\subsection{实测性能拆解：排序瓶颈、反转机制与单步常数}
+
+\textbf{第一，题面常规约束下的主要耗时落在排序上。}在实验族 B（图~\ref{fig:ksweep}(b)）的 \code{K1}--\code{K5} 档位上，$N=10^5$ 的两次 \code{std::sort} 耗时 14--21~ms，而 \code{bsearch} 核心求解全程不足 1~ms，在 \code{K6} 上也只占总耗时的 3.5\%。同时，\code{K7\_max1e6} 与 \code{D3\_all\_equal} 的 $N$ 同样是 $10^5$，排序却缩至 6.1~ms 与 2.4~ms，原因是两者仅有极少数不同取值，GCC 的 Introsort 在大量重复键上更快收敛。不拆分 \code{sort\_ms} 与 \code{solve\_ms}，直接拿不同输入的总耗时比大小就会被排序敏感性误导。
+
+\textbf{第二，$K$ 梯度反转是「随机堆访存」与「顺序扫描」的交叉。}在 $K \le 2\times 10^4$ 时，\code{heap\_lazy} 总步数仅 118 到 2.1 万，比 \code{bsearch} 少两个数量级，求解耗时压在 0.2~ms 内；\code{heap\_full} 需先装满 $10^5$ 个行首，白多出 10 万次写入。到 $K = 94\,517$（\code{K4\_mid2}）时 \code{bsearch} 首次超过两类堆；跨过 $10^5$ 后，堆每次下沉在数组里按 \code{idx<<1} 跨缓存行跳跃，步数随 $K$ 飙升至百万以上，而 \code{bsearch} 顺序扫描连续数组 $p, c$ 吃满硬件预取，在 $K=10^6$ 时拉开超过十倍、在 $D=10^{10}$ 时拉开超过百倍差距。
+
+\textbf{第三，操作步数与实测耗时之间的两处单步代价差。}先看实验族 E（图~\ref{fig:huge_value}(b)）：在 $S=10^{11}$ 处，\code{bsearch} 跑 250 万步仅用 1.78~ms（约 0.71~ns/步），\code{prune} 跑 180 万步却用掉 6.22~ms（约 3.45~ns/步），单步贵 4.8 倍。原因在指令密度与内存写入：\code{bsearch} 一步只是一次 64 位整数减法比较；\code{prune} 每轮要对 5 元小组做 16 字节结构体插入排序、分配中位数数组 \code{meds}、并在三路划分里频繁交换结构体。
+
+另一处单步代价差出现在实验族 D 的 \code{bsearch} 自身：从 \code{B1}（$D=10^6$）到 \code{B6}（$D=10^{14}$），\code{ops} 只从 180 万涨到 302 万（1.67 倍），求解耗时却从 1.43~ms 涨到 19.98~ms（14 倍）。对照 \code{checkBudget} 代码即可看清：在 \code{B1}--\code{B4} 上，180 万步里绝大多数是每轮第 0 行把 $j$ 从 $99\,999$ 线性退回几百的纯减法空转，后面几十行随即触发 \code{p[i]-c[0]>T} 退出；到了 $D=10^{14}$（买下全矩阵 22\% 的格子），每轮都要跑满全部 10 万行，每行执行一次 128 位乘加与跨度较大的 \code{prefC[m]} 访存（1.53~MiB 跨出 L2 缓存）。同一计数器把内层纯减法与外层 128 位乘加和访存混为一谈，导致倍率对不齐。这同时给出一条直接的改进：进入行循环前对第 0 行做一次 \code{upper\_bound}（$O(\log N)$）定位初始 $j$，即可砍掉低预算下的线性回退。
+
+\subsection{理论边界拓展：下界视角与问题变体}
+
+本题是经典「$X+Y$ 笛卡尔和选择问题」的预算约束变形。对无预算约束的第 $k$ 小选择，Johnson 与 Mizoguchi（1978）给出 $O(N\log N)$ 加权中位数算法\cite{jm1978}，Frederickson 与 Johnson（1982）\cite{fj1982}以及 Mirzaian 与 Arjomandi（1985）\cite{ma1985}进一步证明：若数组 $X, Y$ 已排好序，选第 $k$ 小可压缩至 $O(N)$ 线性时间。但在本题完整输入口径下，$p, c$ 初始无序，单确定前 $N$ 小配对的顺序就包含排序下界 $\Omega(N\log N)$，且预算判定必须算精确前缀和而不仅是个数，因此 \code{prune} 在完整输入口径下已经匹配比较模型最优阶 $\Theta(N\log N)$。即便把已排序后的核心阶段进一步改造成分块采样的 $O(N)$ 算法，仍绕不开前置的 $O(N\log N)$ 排序下界，且需额外维护行块前缀和结构。
+
+顺带区分两类易混淆的模型变体：
+\begin{itemize}[leftmargin=1.6em,itemsep=0.15em,topsep=0.15em]
+  \item \textbf{变体一：允许不用优惠券原价购买。}若每种商品至多无券买一次，等价于往优惠券集合加入一张面值为 0 的虚拟券，矩阵变为 $N\times(N+1)$，本文全部算法原样成立；若允许无限无券原价购买，由于 $p_i - c_j < p_i$，原价只会在 $N^2$ 个带券配对买光之后才被使用，在全买光分支后用余钱整除 $\min p_i$ 即可。
+  \item \textbf{变体二：每种优惠券全局限用一次、每种商品限买一次。}此时配对空间从二维矩阵坍缩为一维匹配：买 $k$ 件的最优方案必取最便宜的 $k$ 件商品配面值最大的 $k$ 张券，排序后单趟扫前缀和即可 $O(N\log N)$ 解决，与本题的二维选择结构完全不同。
+\end{itemize}
+
+\subsection{结论}
+
+\begin{enumerate}[leftmargin=1.8em,itemsep=0.18em,topsep=0.18em]
+  \item 实付价格矩阵的行列单调性与 $M[i][j] \ge 1$ 给出上界 $K \le \min(N^2, D)$，使优先队列在题面约束内可行，也划出了它在大预算下的失效边界。
+  \item 在满规模 $N=10^5, D=10^6$ 下，购买量 $K$ 决定求解阶段排名：\code{heap\_lazy} 在 $K \le 2\times 10^4$ 最快（$\le 0.20$~ms），\code{bsearch} 在 $K=94\,517$ 处首次领先并在 $K=10^6$ 压到 0.11--0.41~ms；同时排序在 \code{K1}--\code{K4} 上占两类堆与 \code{bsearch} 总耗时的 95\% 以上（占 \code{prune} 的 61\%--65\%）。
+  \item 预算扩至 $D \gg 10^6$ 后，两类堆随 $K$ 按 $O(K\log N)$ 级迅速膨胀（$D=10^{10}$ 时超 280~ms，$D=10^{14}$ 不可行），而 \code{bsearch} 与 \code{prune} 在买下 22.33 亿件时分别仅需 44.1~ms 与 96.9~ms。
+  \item 控制变量缩放实验证实 \code{prune} 严格免疫值域膨胀（16 轮、180 万步恒定）；但在 64 位整数范围内，顺序双指针极低的单步代价使 \code{bsearch} 始终快于 \code{prune}（即使在最大缩放 $S=10^{11}$ 下仍领先 3.5 倍，常规档位领先 4--20 倍以上），故默认评测模式选用 \code{bsearch}。
+  \item \textbf{适用边界：}上述实测排名与 $K \approx 10^5$ 交叉点仅对本机 GCC \code{-O2}、64 位整数值域及本文五族测试分布成立；若输入推广至高精度大数或任意实数，\code{bsearch} 失去有限步保证，强多项式 \code{prune} 是唯一无条件可行的方案。
+\end{enumerate}
+
+\subsection{局限}
+
+\begin{enumerate}[leftmargin=1.8em,itemsep=0.18em,topsep=0.18em]
+  \item 计时基于 1~ms 粒度的 \code{clock()}；虽经多轮重复平滑，对单次低于 0.05~ms 的极小规模测试（如 $N \le 2000$ 的 \code{bsearch} 求解段）仍无法分辨微秒级差异。
+  \item 缺乏官方隐藏测试集，360 组对拍与五大实验族均由固定种子脚本生成，未必覆盖线上评测的全部对抗分布。
+  \item 内存占用按容器元素字节数与规模上限理论推算，未接入系统级峰值内存采样工具实测。
+  \item 操作计数器 \code{ops} 仅记录最内层循环步数、未按指令权重归一化（如 4.2 节所述，在 \code{bsearch} 中混入了第 0 行纯减法与外层 128 位乘加），不能直接跨算法换算耗时倍率。
+  \item 4.2 节提出的「第 0 行改用 \code{upper\_bound} 定位初始 $j$」优化目前仅是事后机制推论，尚未合入代码做前后对照测量。
+\end{enumerate}
+
+%=====================================================================
+\renewcommand{\refname}{References}
+\begin{thebibliography}{9}
+\small
+\setlength{\itemsep}{2pt}
+\bibitem{clrs2022} T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, ``Introduction to Algorithms'', MIT Press, 4th edition, (2022)
+\bibitem{bfprt1973} M. Blum, R. W. Floyd, V. Pratt, R. L. Rivest, R. E. Tarjan, ``Time bounds for selection'', Journal of Computer and System Sciences, 7(4):448--461, (1973)
+\bibitem{jm1978} D. B. Johnson, T. Mizoguchi, ``Selecting the $K$th element in $X+Y$ and $X_1+X_2+\dots+X_m$'', SIAM Journal on Computing, 7(2):147--153, (1978)
+\bibitem{fj1982} G. N. Frederickson, D. B. Johnson, ``The complexity of selection and ranking in $X+Y$ and matrices with sorted columns'', Journal of Computer and System Sciences, 24(2):197--208, (1982)
+\bibitem{ma1985} A. Mirzaian, E. Arjomandi, ``Selection in $X+Y$ and matrices with sorted rows and columns'', Information Processing Letters, 20(1):13--17, (1985)
+\end{thebibliography}
+
+%=====================================================================
+\clearpage
+\section*{Author List}
+
+\vspace{0.2em}
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{11.4cm}@{}}
+\toprule
+\rowcolor{gray!12}\tabhead{成员} & \tabhead{负责的内容} \\
+\midrule
+Member A & 数学建模与贪心/收尾定理证明，五种求解器（暴力、两类最小堆、值域二分双指针、BFPRT 强多项式矩阵剪枝）的统一接口与核心实现，报告第 1--2 章与第 4 章撰写 \\
+Member B & 四层自动对拍与边界用例构造，五大基准实验族脚本编写、批量测速与图表绘制，报告第 3 章整理、版式校对与匿名提交包自检 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{1.8em}
+
+\section*{Declaration}
+
+\noindent
+We hereby declare that all the work done in this project titled ``Shopping With Coupons: From Heap Merging to Strongly Polynomial Matrix Selection'' is of our independent effort as a group.
+
+\vspace{2.2em}
+\section*{Signatures}
+
+\vspace{1.8em}
+\begin{center}
+\begin{tabular}{@{}c@{\hspace{2.4cm}}c@{}}
+\rule{5.2cm}{0.4pt} & \rule{5.2cm}{0.4pt} \\[0.4em]
+Member A & Member B \\[0.3em]
+Date: \rule{2.8cm}{0.4pt} & Date: \rule{2.8cm}{0.4pt} \\
+\end{tabular}
+\end{center}
+
+\end{document}

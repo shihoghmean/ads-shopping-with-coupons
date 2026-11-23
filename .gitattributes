@@ -1,0 +1,13 @@
+* text=auto eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.py text eol=lf
+*.tex text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.csv text eol=lf
+*.in text eol=lf
+*.out text eol=lf
+*.pdf binary
+*.png binary
